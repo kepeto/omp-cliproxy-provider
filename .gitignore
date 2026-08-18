@@ -1,0 +1,5 @@
+node_modules/
+.pi/
+.omp/
+.DS_Store
+*.log
