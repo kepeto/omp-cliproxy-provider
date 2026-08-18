@@ -185,7 +185,7 @@ test("preserves tier suffixes like :free in matched model display names", () => 
   );
 
   assert.equal(result.models[0].id, "nous-portal-free/tencent/hy3:free");
-  assert.equal(result.models[0].name, "Hy3:free");
+  assert.equal(result.models[0].name, "nous-portal-free/Hy3:free");
   assert.equal(result.stats.enriched, 1);
   assert.equal(result.stats.unmatched, 0);
 });
@@ -214,4 +214,51 @@ test("keeps unmatched model names as the full CPA ID", () => {
   assert.equal(result.models[0].id, "unknown/model:free");
   assert.equal(result.models[0].name, "unknown/model:free");
   assert.equal(result.stats.unmatched, 1);
+});
+
+test("includes gateway prefix to distinguish same-named models from different providers", () => {
+  const result = buildProviderModels(
+    [
+      { id: "gateway-a/tencent/hy3:free", owned_by: "feedmob-litellm" },
+      { id: "gateway-b/tencent/hy3:free", owned_by: "feedmob-litellm" },
+    ],
+    {
+      "tencent/hy3": { id: "tencent/hy3", name: "Hy3" },
+    },
+    {},
+  );
+
+  assert.equal(result.models[0].id, "gateway-a/tencent/hy3:free");
+  assert.equal(result.models[0].name, "gateway-a/Hy3:free");
+  assert.equal(result.models[1].id, "gateway-b/tencent/hy3:free");
+  assert.equal(result.models[1].name, "gateway-b/Hy3:free");
+  assert.equal(result.stats.enriched, 2);
+});
+
+test("does not add prefix when CPA ID aligns exactly with metadata segments", () => {
+  const result = buildProviderModels(
+    [{ id: "tencent/hy3:free", owned_by: "feedmob-litellm" }],
+    {
+      "tencent/hy3": { id: "tencent/hy3", name: "Hy3" },
+    },
+    {},
+  );
+
+  assert.equal(result.models[0].id, "tencent/hy3:free");
+  assert.equal(result.models[0].name, "Hy3:free");
+  assert.equal(result.stats.enriched, 1);
+});
+
+test("does not add misleading prefix when gateway segments do not align with metadata owner", () => {
+  const result = buildProviderModels(
+    [{ id: "proxy/hy3:free", owned_by: "feedmob-litellm" }],
+    {
+      "tencent/hy3": { id: "tencent/hy3", name: "Hy3" },
+    },
+    {},
+  );
+
+  assert.equal(result.models[0].id, "proxy/hy3:free");
+  assert.equal(result.models[0].name, "Hy3:free");
+  assert.equal(result.stats.enriched, 1);
 });

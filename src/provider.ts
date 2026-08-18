@@ -28,17 +28,40 @@ export interface BuildProviderModelsResult {
   stats: BuildProviderModelsStats;
 }
 
-function modelDisplayName(cpaModelId: string, metadataName: string): string {
-  const leaf = cpaModelId.split("/").pop() ?? cpaModelId;
-  const match = leaf.match(/^(.+?)(:[a-z0-9]+)$/i);
-  if (!match) return metadataName;
-  const [, base, suffix] = match;
-  const normalizedBase = normalizeModelName(base);
-  const normalizedMetadata = normalizeModelName(metadataName);
-  if (normalizedMetadata.startsWith(normalizedBase) && !normalizedMetadata.endsWith(normalizeModelName(suffix))) {
-    return `${metadataName}${suffix}`;
+function modelDisplayName(cpaModelId: string, metadataName: string, metadataId?: string): string {
+  const cpaSegments = cpaModelId.split("/");
+  const metadataSegments = metadataId ? metadataId.split("/") : [];
+
+  // Compute the gateway/route prefix: CPA segments that precede the
+  // models.dev-canonical segments. This keeps same-named models from
+  // different gateways distinguishable (e.g. nous-portal-free/Hy3:free
+  // vs some-other/Hy3:free).
+  let prefix = "";
+  if (metadataSegments.length > 0 && cpaSegments.length > metadataSegments.length) {
+    const cpaTail = [...cpaSegments.slice(-metadataSegments.length)];
+    cpaTail[cpaTail.length - 1] = cpaTail[cpaTail.length - 1].replace(/:[a-z0-9]+$/i, "");
+    const aligned =
+      cpaTail.length === metadataSegments.length &&
+      cpaTail.every((seg, i) => seg === metadataSegments[i]);
+    if (aligned) {
+      prefix = cpaSegments.slice(0, cpaSegments.length - metadataSegments.length).join("/");
+    }
   }
-  return metadataName;
+
+  // Preserve tier suffixes like :free in the display name.
+  const leaf = cpaSegments.at(-1) ?? cpaModelId;
+  const match = leaf.match(/^(.+?)(:[a-z0-9]+)$/i);
+  let baseName = metadataName;
+  if (match) {
+    const [, base, suffix] = match;
+    const normalizedBase = normalizeModelName(base);
+    const normalizedMetadata = normalizeModelName(metadataName);
+    if (normalizedMetadata.startsWith(normalizedBase) && !normalizedMetadata.endsWith(normalizeModelName(suffix))) {
+      baseName = `${metadataName}${suffix}`;
+    }
+  }
+
+  return prefix ? `${prefix}/${baseName}` : baseName;
 }
 
 function inputFromMetadata(metadata: ModelsDevMetadata): InputModality[] {
@@ -92,7 +115,7 @@ function modelFromMetadata(
 
   return {
     id: cpaModel.id,
-    name: modelDisplayName(cpaModel.id, metadata.name ?? cpaModel.id),
+    name: modelDisplayName(cpaModel.id, metadata.name ?? cpaModel.id, metadata.id),
     reasoning: capabilityOverrides.reasoning ?? metadata.reasoning ?? PI_MODEL_DEFAULTS.reasoning,
     ...(api ? { api } : {}),
     ...(capabilityOverrides.thinking
