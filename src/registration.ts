@@ -1,5 +1,6 @@
 import type { ProviderConfig, ProviderModelConfig } from "@oh-my-pi/pi-coding-agent";
 import type { CpaProviderConfig, ProviderModelConfigLike } from "./types.ts";
+import { readAuthKeyFromDisk } from "./auth.ts";
 
 export interface ProviderRegistration {
   providerName: string;
@@ -38,7 +39,9 @@ export function buildProviderRegistration(
     config: {
       baseUrl: config.baseUrl,
       api: "openai-completions",
-      apiKey: config.authRequired ? "CLIPROXYAPI_API_KEY" : "cliproxyapi-no-auth",
+      apiKey: config.authRequired
+        ? (process.env.CLIPROXYAPI_API_KEY || readAuthKeyFromDisk(config.providerName) || "CLIPROXYAPI_API_KEY")
+        : "cliproxyapi-no-auth",
       authHeader: config.authRequired && config.authHeader,
       headers: Object.keys(config.headers).length > 0 ? config.headers : undefined,
       models: normalizeProviderModels(models),

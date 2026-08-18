@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionCommandContext } from "@oh-my-pi/pi-coding-
 import { DEFAULT_CONFIG, loadConfig, globalConfigPath, readConfigFile, writeConfigFile, type ConfigLayer } from "./config.ts";
 import type { ProviderCatalog, CatalogSnapshot, RefreshTarget, SourceRefreshResult } from "./catalog.ts";
 import type { ProviderRuntime } from "./runtime.ts";
+import { getDiscoveryApiKey, writeAuthKey } from "./auth.ts";
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -117,10 +118,70 @@ function parseRefreshTarget(value: string | undefined): RefreshTarget | undefine
   return undefined;
 }
 
+const CLIPROXYAPI_HELP = [
+  "CLIProxyAPI provider commands:",
+  "  /cliproxyapi status            Show provider and model-catalog status",
+  "  /cliproxyapi refresh           Refresh CPA models and models.dev metadata",
+  "  /cliproxyapi refresh models    Refresh CPA models only",
+  "  /cliproxyapi refresh metadata  Refresh models.dev metadata only",
+  "  /cliproxyapi aliases           Show unmatched model IDs for alias configuration",
+  "  /cliproxyapi config            Configure model behavior and display",
+  "  /cliproxyapi config connection Configure provider endpoint and auth",
+  "  /cliproxyapi login             Set CLIProxyAPI base URL and API key (use this, NOT /login cpa)",
+  "  /cliproxyapi help              Show this help",
+  "",
+  "Note: do not use the built-in /login cpa command — omp only supports OAuth",
+  "logins there and it will warn about a missing callback. Use /cliproxyapi login",
+  "to store the CLIProxyAPI API key.",
+].join("\n");
+
 export function cliproxyapiArgumentCompletions(prefix: string): Array<{ value: string; label: string }> {
-  return ["config", "status", "refresh", "refresh models", "refresh metadata", "aliases", "help"]
+  return ["config", "config connection", "status", "refresh", "refresh models", "refresh metadata", "aliases", "login", "help"]
     .filter((item) => item.startsWith(prefix))
     .map((value) => ({ value, label: value }));
+}
+
+export async function runLogin(ctx: ExtensionCommandContext): Promise<void> {
+  if (!ctx.hasUI) {
+    ctx.ui.notify("/cliproxyapi login requires an interactive UI.", "warning");
+    return;
+  }
+  const config = loadConfig(ctx.cwd);
+  const baseUrlInput = await ctx.ui.input(
+    `CLIProxyAPI base URL (leave blank to keep: ${config.baseUrl})`,
+    `leave blank to keep ${config.baseUrl}`,
+  );
+  if (baseUrlInput === undefined) return;
+  const keyInput = await ctx.ui.input(
+    `CLIProxyAPI API key for provider "${config.providerName}"`,
+    "paste the API key shown by your CLIProxyAPI instance",
+  );
+  if (keyInput === undefined) return;
+
+  const baseUrl = baseUrlInput || config.baseUrl;
+  const key = keyInput.trim();
+  if (!key) {
+    ctx.ui.notify("API key is empty; aborting login.", "warning");
+    return;
+  }
+
+  // Persist base URL to the provider config (used for discovery + requests).
+  writeConfigFile(globalConfigPath(), {
+    ...(readConfigFile(globalConfigPath()) ?? {}),
+    providerName: config.providerName,
+    baseUrl,
+    authRequired: true,
+    authHeader: true,
+  });
+
+  // Persist the key to auth.json (read back by getDiscoveryApiKey / refresh).
+  writeAuthKey(config.providerName, key);
+
+  ctx.ui.notify(
+    `Saved CLIProxyAPI credentials for "${config.providerName}" (base URL: ${baseUrl}). Reloading to apply...`,
+    "info",
+  );
+  await ctx.reload();
 }
 
 export function registerCliproxyapiCommand(pi: ExtensionAPI, runtime?: ProviderRuntime, catalog?: ProviderCatalog): void {
@@ -130,8 +191,28 @@ export function registerCliproxyapiCommand(pi: ExtensionAPI, runtime?: ProviderR
       return cliproxyapiArgumentCompletions(prefix);
     },
     async handler(args, ctx) {
-      const [subcommand = "help", option] = args.trim().split(/\s+/);
-      if (subcommand === "config") return runConfig(ctx);
+      const commandArgs = args.trim();
+      const [subcommand, option] = commandArgs ? commandArgs.split(/\s+/) : ["help"];
+      if (subcommand === "help") {
+        ctx.ui.notify(CLIPROXYAPI_HELP, "info");
+        return;
+      }
+      if (subcommand === "config") {
+        if (option === "connection") return runConfig(ctx);
+        if (option) {
+          ctx.ui.notify("Usage: /cliproxyapi config [connection]", "warning");
+          return;
+        }
+        ctx.ui.notify("Usage: /cliproxyapi config connection", "info");
+        return;
+      }
+      if (subcommand === "login") {
+        return runLogin(ctx);
+      }
+      if (!["status", "refresh", "aliases"].includes(subcommand)) {
+        ctx.ui.notify(`${CLIPROXYAPI_HELP}\n\nUnknown command: ${subcommand}`, "warning");
+        return;
+      }
       if (!runtime || !catalog) {
         ctx.ui.notify("CLIProxyAPI provider is unavailable. Run /cliproxyapi config and reload pi.", "error");
         return;
@@ -148,10 +229,10 @@ export function registerCliproxyapiCommand(pi: ExtensionAPI, runtime?: ProviderR
           ctx.ui.notify("Usage: /cliproxyapi refresh [models|metadata]", "warning");
           return;
         }
-        const getDiscoveryApiKey = target === "metadata"
+        const getDiscoveryApiKeyFn = target === "metadata"
           ? undefined
-          : () => ctx.modelRegistry.getApiKeyForProvider(config.providerName);
-        const result = await runtime.refresh(target, "manual", getDiscoveryApiKey);
+          : () => getDiscoveryApiKey(config.providerName);
+        const result = await runtime.refresh(target, "manual", getDiscoveryApiKeyFn);
         const level = result.models.error || result.metadata.error ? "warning" : "info";
         ctx.ui.notify([
           "CLIProxyAPI provider refresh complete.",
@@ -170,7 +251,7 @@ export function registerCliproxyapiCommand(pi: ExtensionAPI, runtime?: ProviderR
         ctx.ui.notify(body, snapshot.built.stats.unmatched ? "warning" : "info");
         return;
       }
-      ctx.ui.notify("Usage: /cliproxyapi config|status|refresh [models|metadata]|aliases", "info");
     },
   });
 }
+
