@@ -1,5 +1,5 @@
 import type { CpaModel } from "./cpa.ts";
-import { findMetadataMatch, type MetadataMatchMethod } from "./matching.ts";
+import { findMetadataMatch, type MetadataMatchMethod, normalizeModelName } from "./matching.ts";
 import { getModelApiOverride, isGpt56Model, type ModelApiContext } from "./model-api.ts";
 import { getModelCapabilityOverrides } from "./model-capabilities.ts";
 import type { Gpt56ContextWindowMode } from "./settings.ts";
@@ -26,6 +26,19 @@ export interface BuildProviderModelsStats {
 export interface BuildProviderModelsResult {
   models: ProviderModelConfigLike[];
   stats: BuildProviderModelsStats;
+}
+
+function modelDisplayName(cpaModelId: string, metadataName: string): string {
+  const leaf = cpaModelId.split("/").pop() ?? cpaModelId;
+  const match = leaf.match(/^(.+?)(:[a-z0-9]+)$/i);
+  if (!match) return metadataName;
+  const [, base, suffix] = match;
+  const normalizedBase = normalizeModelName(base);
+  const normalizedMetadata = normalizeModelName(metadataName);
+  if (normalizedMetadata.startsWith(normalizedBase) && !normalizedMetadata.endsWith(normalizeModelName(suffix))) {
+    return `${metadataName}${suffix}`;
+  }
+  return metadataName;
 }
 
 function inputFromMetadata(metadata: ModelsDevMetadata): InputModality[] {
@@ -79,7 +92,7 @@ function modelFromMetadata(
 
   return {
     id: cpaModel.id,
-    name: metadata.name ?? cpaModel.id,
+    name: modelDisplayName(cpaModel.id, metadata.name ?? cpaModel.id),
     reasoning: capabilityOverrides.reasoning ?? metadata.reasoning ?? PI_MODEL_DEFAULTS.reasoning,
     ...(api ? { api } : {}),
     ...(capabilityOverrides.thinking
@@ -107,7 +120,7 @@ function defaultModel(cpaModel: CpaModel, gpt56ContextWindow: Gpt56ContextWindow
 
   return {
     id: cpaModel.id,
-    name: cpaModel.id,
+    name: modelDisplayName(cpaModel.id, cpaModel.id),
     ...cloneModelDefaults(),
     ...capabilityOverrides,
     ...(api ? { api } : {}),

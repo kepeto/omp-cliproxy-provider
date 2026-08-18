@@ -174,3 +174,44 @@ test("adds GPT-5.6 capabilities even when metadata is unavailable", () => {
   assert.deepEqual(result.models[0].thinking, GPT_5_6_THINKING);
   assert.equal(result.models[0].contextWindow, 272000);
 });
+
+test("preserves tier suffixes like :free in matched model display names", () => {
+  const result = buildProviderModels(
+    [{ id: "nous-portal-free/tencent/hy3:free", owned_by: "feedmob-litellm" }],
+    {
+      "tencent/hy3": { id: "tencent/hy3", name: "Hy3" },
+    },
+    {},
+  );
+
+  assert.equal(result.models[0].id, "nous-portal-free/tencent/hy3:free");
+  assert.equal(result.models[0].name, "Hy3:free");
+  assert.equal(result.stats.enriched, 1);
+  assert.equal(result.stats.unmatched, 0);
+});
+
+test("does not duplicate suffixes already present in metadata names", () => {
+  const result = buildProviderModels(
+    [{ id: "provider/model:free", owned_by: "feedmob-litellm" }],
+    {
+      "provider/model:free": { id: "provider/model:free", name: "Model Free" },
+    },
+    {},
+  );
+
+  assert.equal(result.models[0].id, "provider/model:free");
+  assert.equal(result.models[0].name, "Model Free");
+  assert.equal(result.stats.enriched, 1);
+});
+
+test("keeps unmatched model names as the full CPA ID", () => {
+  const result = buildProviderModels(
+    [{ id: "unknown/model:free" }],
+    {},
+    {},
+  );
+
+  assert.equal(result.models[0].id, "unknown/model:free");
+  assert.equal(result.models[0].name, "unknown/model:free");
+  assert.equal(result.stats.unmatched, 1);
+});

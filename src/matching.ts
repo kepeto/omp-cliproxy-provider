@@ -65,7 +65,6 @@ export function findMetadataMatch(
     return { metadataId: cpaModel.id, metadata: catalog[cpaModel.id], method: "exact" };
   }
 
-  const suffixCandidates = Object.keys(catalog).filter((key) => key.endsWith(`/${cpaModel.id}`));
   const owner = cpaModel.owned_by?.trim().toLowerCase();
   const canonicalOwner = owner ? CANONICAL_OWNER_PREFIXES[owner] : undefined;
   if (canonicalOwner) {
@@ -75,49 +74,76 @@ export function findMetadataMatch(
     }
   }
 
-  const segmentSuffixKey = oneMatch(
-    Object.keys(catalog).filter((key) => segmentSuffixMatch(cpaModel.id, key, true)),
-  );
+  const segments = cpaModel.id.split("/");
+  const leaf = segments.at(-1) ?? cpaModel.id;
+  const leafBase = leaf.replace(/:[a-z0-9]+$/i, "");
+  const normalizedId = normalizeModelName(cpaModel.id.replace(/:[a-z0-9]+$/i, ""));
+  const normalizedLeaf = normalizeModelName(leaf);
+  const normalizedLeafBase = normalizeModelName(leafBase);
+
+  const exactSuffixCandidates: string[] = [];
+  const segmentSuffixCandidates: string[] = [];
+  const normalizedSuffixCandidates: string[] = [];
+  const leafSuffixCandidates: string[] = [];
+  const leafBaseSuffixCandidates: string[] = [];
+  const normalizedLeafSuffixCandidates: string[] = [];
+  const normalizedLeafBaseSuffixCandidates: string[] = [];
+
+  for (const key of Object.keys(catalog)) {
+    if (key.endsWith(`/${cpaModel.id}`)) {
+      exactSuffixCandidates.push(key);
+    }
+    if (segmentSuffixMatch(cpaModel.id, key, true)) {
+      segmentSuffixCandidates.push(key);
+    }
+    if (normalizeModelName(key.split("/").at(-1) ?? key) === normalizedId) {
+      normalizedSuffixCandidates.push(key);
+    }
+    if (key.endsWith(`/${leaf}`)) {
+      leafSuffixCandidates.push(key);
+    }
+    if (key.endsWith(`/${leafBase}`)) {
+      leafBaseSuffixCandidates.push(key);
+    }
+    if (normalizeModelName(key.split("/").at(-1) ?? key) === normalizedLeaf) {
+      normalizedLeafSuffixCandidates.push(key);
+    }
+    if (normalizeModelName(key.split("/").at(-1) ?? key) === normalizedLeafBase) {
+      normalizedLeafBaseSuffixCandidates.push(key);
+    }
+  }
+
+  const exactSuffixKey = oneMatch(exactSuffixCandidates);
+  if (exactSuffixKey) {
+    return { metadataId: exactSuffixKey, metadata: catalog[exactSuffixKey], method: "suffix" };
+  }
+
+  const segmentSuffixKey = oneMatch(segmentSuffixCandidates);
   if (segmentSuffixKey) {
     return { metadataId: segmentSuffixKey, metadata: catalog[segmentSuffixKey], method: "suffix" };
   }
 
-  const normalizedId = normalizeModelName(cpaModel.id.replace(/:[a-z0-9]+$/i, ""));
-  const normalizedLeafKey = oneMatch(
-    Object.keys(catalog).filter((key) => normalizeModelName(key.split("/").at(-1) ?? key) === normalizedId),
-  );
-  if (normalizedLeafKey) {
-    return { metadataId: normalizedLeafKey, metadata: catalog[normalizedLeafKey], method: "normalized-suffix" };
+  const normalizedSuffixKey = oneMatch(normalizedSuffixCandidates);
+  if (normalizedSuffixKey) {
+    return { metadataId: normalizedSuffixKey, metadata: catalog[normalizedSuffixKey], method: "normalized-suffix" };
   }
 
-  const segments = cpaModel.id.split("/");
-  const leaf = segments.at(-1) ?? cpaModel.id;
-  const leafBase = leaf.replace(/:[a-z0-9]+$/i, "");
-
-  const leafSuffixCandidates = Object.keys(catalog).filter((key) => key.endsWith(`/${leaf}`));
   const leafSuffixKey = oneMatch(leafSuffixCandidates);
   if (leafSuffixKey) {
     return { metadataId: leafSuffixKey, metadata: catalog[leafSuffixKey], method: "suffix" };
   }
 
-  const leafBaseSuffixCandidates = Object.keys(catalog).filter((key) => key.endsWith(`/${leafBase}`));
   const leafBaseSuffixKey = oneMatch(leafBaseSuffixCandidates);
   if (leafBaseSuffixKey) {
     return { metadataId: leafBaseSuffixKey, metadata: catalog[leafBaseSuffixKey], method: "suffix" };
   }
 
-  const normalizedLeaf = normalizeModelName(leaf);
-  const normalizedLeafSuffixKey = oneMatch(
-    Object.keys(catalog).filter((key) => normalizeModelName(key.split("/").at(-1) ?? key) === normalizedLeaf),
-  );
+  const normalizedLeafSuffixKey = oneMatch(normalizedLeafSuffixCandidates);
   if (normalizedLeafSuffixKey) {
     return { metadataId: normalizedLeafSuffixKey, metadata: catalog[normalizedLeafSuffixKey], method: "normalized-suffix" };
   }
 
-  const normalizedLeafBase = normalizeModelName(leafBase);
-  const normalizedLeafBaseSuffixKey = oneMatch(
-    Object.keys(catalog).filter((key) => normalizeModelName(key.split("/").at(-1) ?? key) === normalizedLeafBase),
-  );
+  const normalizedLeafBaseSuffixKey = oneMatch(normalizedLeafBaseSuffixCandidates);
   if (normalizedLeafBaseSuffixKey) {
     return { metadataId: normalizedLeafBaseSuffixKey, metadata: catalog[normalizedLeafBaseSuffixKey], method: "normalized-suffix" };
   }
