@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mergeConfigLayers, DEFAULT_CONFIG, readConfigFile, readProjectConfigFile } from "../src/config.ts";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mergeConfigLayers, DEFAULT_CONFIG, readConfigFile, readProjectConfigFile, readProjectConfigLayers, loadConfig } from "../src/config.ts";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -104,5 +104,25 @@ test("rejects malformed config values with actionable errors", async () => {
     );
   } finally {
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("project config layers merge .omp and .pi with .pi winning", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-cpa-dual-project-"));
+  try {
+    await mkdir(join(cwd, ".omp", "pi-cliproxyapi-provider"), { recursive: true });
+    await mkdir(join(cwd, ".pi", "pi-cliproxyapi-provider"), { recursive: true });
+    await writeFile(join(cwd, ".omp", "pi-cliproxyapi-provider", "config.json"),
+      JSON.stringify({ modelAliases: { a: "openai/a" } }));
+    await writeFile(join(cwd, ".pi", "pi-cliproxyapi-provider", "config.json"),
+      JSON.stringify({ modelAliases: { b: "openai/b" } }));
+
+    const merged = loadConfig(cwd);
+    assert.deepEqual(merged.modelAliases, { a: "openai/a", b: "openai/b" });
+
+    const pinned = loadConfig(cwd, { PI_CONFIG_DIR: ".pi" });
+    assert.deepEqual(pinned.modelAliases, { b: "openai/b" });
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
   }
 });

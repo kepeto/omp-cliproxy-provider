@@ -27,15 +27,24 @@ export function globalConfigPath(): string {
 }
 
 /**
- * Project config: `<cwd>/<config-dir>/pi-cliproxyapi-provider/config.json`
- * (project-level `modelAliases` only). Dual-runtime: `PI_CONFIG_DIR` wins,
- * then the first of `.omp` / `.pi` that exists on disk, else `.omp`.
+ * Project config layers: `<cwd>/<dir>/pi-cliproxyapi-provider/config.json`
+ * (project-level `modelAliases` only). Dual-runtime: with `PI_CONFIG_DIR`
+ * set, only that directory is read; otherwise both `.omp` and `.pi` are
+ * merged (`.pi` wins). Project config is read-only — writes go to the
+ * global config.
  */
-export function projectConfigPath(cwd: string): string {
-  const dir = process.env.PI_CONFIG_DIR?.trim()
-    || [".omp", ".pi"].find((d) => existsSync(join(cwd, d)))
-    || ".omp";
-  return join(cwd, dir, "pi-cliproxyapi-provider", "config.json");
+export function readProjectConfigLayers(cwd: string, env: NodeJS.ProcessEnv = process.env): ConfigLayer {
+  const pinned = env.PI_CONFIG_DIR?.trim();
+  const dirs = pinned ? [pinned] : [".omp", ".pi"];
+  const layers = dirs
+    .map((dir) => readConfigFile(join(cwd, dir, "pi-cliproxyapi-provider", "config.json")))
+    .filter((layer): layer is ConfigLayer => layer !== undefined);
+  const merged = Object.assign({}, ...layers);
+  if (layers.some((layer) => layer.modelAliases)) {
+    // ponytail: Object.assign is shallow — merge alias maps explicitly.
+    merged.modelAliases = Object.assign({}, ...layers.map((layer) => layer.modelAliases));
+  }
+  return merged;
 }
 
 export function cacheDir(): string {
@@ -165,7 +174,7 @@ export function readProjectConfigFile(path: string): ConfigLayer | undefined {
 }
 
 export function loadConfig(cwd: string, env: NodeJS.ProcessEnv = process.env): CpaProviderConfig {
-  return mergeConfigLayers(readConfigFile(globalConfigPath()), readProjectConfigFile(projectConfigPath(cwd)), env);
+  return mergeConfigLayers(readConfigFile(globalConfigPath()), readProjectConfigLayers(cwd, env), env);
 }
 
 export function writeConfigFile(path: string, config: ConfigLayer): void {
