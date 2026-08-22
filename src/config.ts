@@ -28,11 +28,14 @@ export function globalConfigPath(): string {
 
 /**
  * Project config: `<cwd>/<config-dir>/pi-cliproxyapi-provider/config.json`
- * (project-level `modelAliases` only). `<config-dir>` is omp's project
- * config directory name — `PI_CONFIG_DIR` or the default `.omp`.
+ * (project-level `modelAliases` only). Dual-runtime: `PI_CONFIG_DIR` wins,
+ * then the first of `.omp` / `.pi` that exists on disk, else `.omp`.
  */
 export function projectConfigPath(cwd: string): string {
-  return join(cwd, process.env.PI_CONFIG_DIR?.trim() || ".omp", "pi-cliproxyapi-provider", "config.json");
+  const dir = process.env.PI_CONFIG_DIR?.trim()
+    || [".omp", ".pi"].find((d) => existsSync(join(cwd, d)))
+    || ".omp";
+  return join(cwd, dir, "pi-cliproxyapi-provider", "config.json");
 }
 
 export function cacheDir(): string {
