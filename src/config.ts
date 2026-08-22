@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { getAgentDir } from "@oh-my-pi/pi-coding-agent";
+import { getAgentDir } from "./host.ts";
 import type { CpaProviderConfig } from "./types.ts";
 
 export type ConfigLayer = Partial<CpaProviderConfig>;

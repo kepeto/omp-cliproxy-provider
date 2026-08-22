@@ -1,5 +1,6 @@
-import { Effort } from "@oh-my-pi/pi-ai";
+import type { Effort as EffortLevel } from "@oh-my-pi/pi-ai";
 import type { ProviderModelConfig } from "@oh-my-pi/pi-coding-agent";
+import { Effort } from "./host.ts";
 
 export interface ModelCapabilityContext {
   availableModelId: string;
@@ -30,7 +31,14 @@ interface ModelCapabilityRule {
  */
 export const GPT_5_6_THINKING: NonNullable<ProviderModelConfig["thinking"]> = {
   mode: "effort",
-  efforts: [Effort.Minimal, Effort.Low, Effort.Medium, Effort.High, Effort.XHigh, Effort.Max],
+  efforts: [
+    Effort.Minimal,
+    Effort.Low,
+    Effort.Medium,
+    Effort.High,
+    Effort.XHigh,
+    Effort.Max,
+  ] as readonly EffortLevel[],
 };
 
 function includesModelFamily(context: ModelCapabilityContext, family: string): boolean {

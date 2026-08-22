@@ -1,8 +1,8 @@
 # omp-cliproxy-provider
 
-OMP provider extension for [CLIProxyAPI](https://github.com/0xRichardH/pi-cliproxyapi-provider) with automatic model discovery and [models.dev](https://models.dev) enrichment.
+CLIProxyAPI provider extension for [OMP](https://github.com/oh-my-pi/omp) and [pi.dev](https://pi.dev) with automatic model discovery and [models.dev](https://models.dev) enrichment.
 
-Port of [`pi-cliproxyapi-provider`](https://github.com/0xRichardH/pi-cliproxyapi-provider) to OMP 17.x, with fixes for OAuth login handling and model-name preservation for routed/free-tier models.
+Single package, dual runtime: detects the host at load time (`@oh-my-pi/pi-coding-agent` on OMP, `@earendil-works/pi-coding-agent` on pi.dev) via a small shim (`src/host.ts`). Port of [`pi-cliproxyapi-provider`](https://github.com/0xRichardH/pi-cliproxyapi-provider), with fixes for OAuth login handling and model-name preservation for routed/free-tier models.
 
 ## Features
 
@@ -15,7 +15,7 @@ Port of [`pi-cliproxyapi-provider`](https://github.com/0xRichardH/pi-cliproxyapi
 
 ## Requirements
 
-- OMP `>= 17.0.0`
+- OMP `>= 17.0.0` or pi.dev (any recent version)
 - CLIProxyAPI-compatible backend URL and API key (if auth is required)
 
 ## Installation

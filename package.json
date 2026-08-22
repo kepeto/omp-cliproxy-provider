@@ -1,7 +1,7 @@
 {
   "name": "omp-cliproxy-provider",
-  "version": "0.4.12",
-  "description": "OMP provider extension for CLIProxyAPI with automatic model discovery and models.dev enrichment.",
+  "version": "0.5.0",
+  "description": "CLIProxyAPI provider extension for OMP and pi.dev with automatic model discovery and models.dev enrichment.",
   "type": "module",
   "license": "MIT",
   "private": false,
