@@ -37,7 +37,7 @@ export function readProjectConfigLayers(cwd: string, env: NodeJS.ProcessEnv = pr
   const pinned = env.PI_CONFIG_DIR?.trim();
   const dirs = pinned ? [pinned] : [".omp", ".pi"];
   const layers = dirs
-    .map((dir) => readConfigFile(join(cwd, dir, "pi-cliproxyapi-provider", "config.json")))
+    .map((dir) => readProjectConfigFile(join(cwd, dir, "pi-cliproxyapi-provider", "config.json")))
     .filter((layer): layer is ConfigLayer => layer !== undefined);
   const merged = Object.assign({}, ...layers);
   if (layers.some((layer) => layer.modelAliases)) {
